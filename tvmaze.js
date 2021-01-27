@@ -18,19 +18,15 @@
       }
  */
 async function searchShows(query) {
-  // TODO: Make an ajax request to the searchShows api.  Remove
-  // hard coded data.
-
-  return [
-    {
-      id: 1767,
-      name: "The Bletchley Circle",
-      summary: "<p><b>The Bletchley Circle</b> follows the journey of four ordinary women with extraordinary skills that helped to end World War II.</p><p>Set in 1952, Susan, Millie, Lucy and Jean have returned to their normal lives, modestly setting aside the part they played in producing crucial intelligence, which helped the Allies to victory and shortened the war. When Susan discovers a hidden code behind an unsolved murder she is met by skepticism from the police. She quickly realises she can only begin to crack the murders and bring the culprit to justice with her former friends.</p>",
-      image: "http://static.tvmaze.com/uploads/images/medium_portrait/147/369403.jpg"
-    }
-  ]
+  const url = `http://api.tvmaze.com/search/shows?q=${query}`;
+  const res = await axios.get(url);
+  const showData = res.data.map(function(show) {
+    const { id, name, summary, image } = show.show;
+    const imgUrl = (!image) ? 'https://tinyurl.com/tv-missing' : image.medium;
+    return ({ id, name, summary, image: imgUrl });
+  })
+  return showData;
 }
-
 
 
 /** Populate shows list:
@@ -46,14 +42,32 @@ function populateShows(shows) {
       `<div class="col-md-6 col-lg-3 Show" data-show-id="${show.id}">
          <div class="card" data-show-id="${show.id}">
            <div class="card-body">
+             <img class="card-img-top" src="${show.image}">
              <h5 class="card-title">${show.name}</h5>
              <p class="card-text">${show.summary}</p>
+             <button class="btn btn-primary episode" data-toggle="modal" data-target="#infoModal">Episodes</button>
+             <button class="btn btn-primary cast" data-toggle="modal" data-target="#infoModal">Cast</button>
            </div>
          </div>
        </div>
       `);
 
     $showsList.append($item);
+
+    // add click handler to episodes button
+    $item.on('click', 'button', async function handleClick (evt) {
+      const id = $(this).closest('.card').attr('data-show-id');
+      console.log($(this));
+      if ($(this).hasClass('episode')) {
+        $('#modalTitle').text("Episodes");
+        const episodes = await getEpisodes(id);
+        populateEpisodes(episodes);
+      } else if ($(this).hasClass('cast')) {
+        $('#modalTitle').text("Cast");
+        const cast = await getCast(id);
+        populateCast(cast);
+      }
+    })
   }
 }
 
@@ -82,9 +96,53 @@ $("#search-form").on("submit", async function handleSearch (evt) {
  */
 
 async function getEpisodes(id) {
-  // TODO: get episodes from tvmaze
-  //       you can get this by making GET request to
-  //       http://api.tvmaze.com/shows/SHOW-ID-HERE/episodes
+  const url = `http://api.tvmaze.com/shows/${id}/episodes`;
+  const res = await axios.get(url);     
+  const episodes = res.data.map((episode) => {
+    const {id, name, season, number} = episode;
+    return ({id, name, season, number});
+  });
+  return episodes;
+}
 
-  // TODO: return array-of-episode-info, as described in docstring above
+// populate the episode are with the list of episodes of the selected show
+
+function populateEpisodes(episodes) {
+  const $episodesList = $('#item-list');
+  $episodesList.html('');
+  if (episodes.length === 0) {
+    $episodeList.append("<p>No episode information available</p>");
+  }
+
+  for (let episode of episodes) {
+    const {name, season, number} = episode;
+    const $entry = `<li>${name} (season ${season}, episode ${number})`;
+    $episodesList.append($entry);
+  }
+}
+
+// given a show id, get the show's cast in a list: {person, character}
+
+async function getCast(id) {
+  const url = `http://api.tvmaze.com/shows/${id}/cast`;
+  const res = await axios.get(url);     
+  const cast = res.data.map((member) => {
+    const {person, character} = member;
+    return ({person: person.name, character: character.name});
+  });
+  return cast;
+}
+
+function populateCast(cast) {
+  const $castList = $('#item-list');
+  $castList.html('');
+  if (cast.length === 0) {
+    $castList.append("<p>No cast information available</p>");
+  }
+
+  for (let member of cast) {
+    const {person, character} = member;
+    const $entry = `<li>${person} plays ${character}`;
+    $castList.append($entry);
+  }
 }
