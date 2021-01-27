@@ -19,13 +19,19 @@
  */
 async function searchShows(query) {
   const url = `http://api.tvmaze.com/search/shows?q=${query}`;
-  const res = await axios.get(url);
-  const showData = res.data.map(function(show) {
-    const { id, name, summary, image } = show.show;
-    const imgUrl = (!image) ? 'https://tinyurl.com/tv-missing' : image.medium;
-    return ({ id, name, summary, image: imgUrl });
-  })
-  return showData;
+  try {
+    const res = await axios.get(url);
+    const showData = res.data.map(function(show) {
+      const { id, name, summary, image } = show.show;
+      const imgUrl = (!image) ? 'https://tinyurl.com/tv-missing' : image.medium;
+      const summaryText = (summary === null) ? "" : summary;
+      return ({ id, name, summary: summaryText, image: imgUrl });
+    })
+    return showData;
+  } catch(e) {
+    console.log(e);
+    showErrorAlert("Something went wrong.");
+  }
 }
 
 
@@ -59,11 +65,9 @@ function populateShows(shows) {
       const id = $(this).closest('.card').attr('data-show-id');
       console.log($(this));
       if ($(this).hasClass('episode')) {
-        $('#modalTitle').text("Episodes");
         const episodes = await getEpisodes(id);
         populateEpisodes(episodes);
       } else if ($(this).hasClass('cast')) {
-        $('#modalTitle').text("Cast");
         const cast = await getCast(id);
         populateCast(cast);
       }
@@ -86,8 +90,11 @@ $("#search-form").on("submit", async function handleSearch (evt) {
   $("#episodes-area").hide();
 
   let shows = await searchShows(query);
-
-  populateShows(shows);
+  if (shows.length > 0) {
+    populateShows(shows);
+  } else {
+    showErrorAlert("No results found for that search.")
+  }
 });
 
 
@@ -97,17 +104,23 @@ $("#search-form").on("submit", async function handleSearch (evt) {
 
 async function getEpisodes(id) {
   const url = `http://api.tvmaze.com/shows/${id}/episodes`;
-  const res = await axios.get(url);     
-  const episodes = res.data.map((episode) => {
-    const {id, name, season, number} = episode;
-    return ({id, name, season, number});
-  });
+  try {
+    const res = await axios.get(url);     
+    const episodes = res.data.map((episode) => {
+      const {id, name, season, number} = episode;
+      return ({id, name, season, number});
+    });
   return episodes;
+  } catch(e) {
+    console.log(e);
+    showErrorAlert("Something went wrong.");
+  }
 }
 
 // populate the episode are with the list of episodes of the selected show
 
 function populateEpisodes(episodes) {
+  $('#modalTitle').text("Episodes");
   const $episodesList = $('#item-list');
   $episodesList.html('');
   if (episodes.length === 0) {
@@ -125,15 +138,21 @@ function populateEpisodes(episodes) {
 
 async function getCast(id) {
   const url = `http://api.tvmaze.com/shows/${id}/cast`;
-  const res = await axios.get(url);     
-  const cast = res.data.map((member) => {
-    const {person, character} = member;
-    return ({person: person.name, character: character.name});
-  });
-  return cast;
+  try {
+    const res = await axios.get(url);     
+    const cast = res.data.map((member) => {
+      const {person, character} = member;
+      return ({person: person.name, character: character.name});
+    });
+    return cast;
+  } catch(e) {
+    console.log(e);
+    showErrorAlert("Something went wrong.");
+  }
 }
 
 function populateCast(cast) {
+  $('#modalTitle').text("Cast");
   const $castList = $('#item-list');
   $castList.html('');
   if (cast.length === 0) {
@@ -145,4 +164,10 @@ function populateCast(cast) {
     const $entry = `<li>${person} plays ${character}`;
     $castList.append($entry);
   }
+}
+
+function showErrorAlert(text) {
+  $('#modalTitle').text("Sorry!");
+  $('#item-list').html(`<p>${text}</p>`);
+  $('#infoModal').modal("show");
 }
